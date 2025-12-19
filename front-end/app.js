@@ -1,10 +1,31 @@
 /* =========================================================
-   MOCK BACKEND
-   Replace fetchPullRequests() with:
-   fetch("/api/pull-requests").then(r => r.json())
+   FETCH FROM API
    ========================================================= */
-function fetchPullRequests() {
-  return Promise.resolve({
+async function fetchPullRequests() {
+  try {
+    console.log("Fetching PRs from /api/pull-requests...");
+    const response = await fetch("/api/pull-requests");
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API error:", response.status, errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log("Fetched data:", data);
+    console.log(`Found ${data.pullRequests?.length || 0} PR(s)`);
+    return data;
+  } catch (error) {
+    console.error("Error fetching PRs:", error);
+    // Fallback to empty data on error
+    return { pullRequests: [] };
+  }
+}
+
+/* =========================================================
+   MOCK DATA (FALLBACK - NOT USED IN PRODUCTION)
+   ========================================================= */
+function getMockData() {
+  return {
     pullRequests: [
       {
         id: 1,
@@ -110,7 +131,7 @@ function fetchPullRequests() {
         ],
       },
     ],
-  });
+  };
 }
 
 /* =========================================================
@@ -336,12 +357,43 @@ function renderSection(title, items, kind) {
    RENDER MAIN
    ========================================================= */
 function getDerivedPR(pr) {
-  const groups = countByType(pr.coderabbitReviews);
-  const confidence = computeConfidence(pr);
-  const why = computeWhyRisky(pr);
-  const fixFirst = computeFixOrder(pr);
+  try {
+    // Ensure coderabbitReviews exists and is an array
+    if (!pr.coderabbitReviews) {
+      pr.coderabbitReviews = [];
+    }
+    
+    // Ensure all reviews have required fields
+    pr.coderabbitReviews = pr.coderabbitReviews.map(review => {
+      if (!review.risk && review.risk !== 0) {
+        // Set default risk based on type
+        if (review.type === "danger") review.risk = 85;
+        else if (review.type === "warning") review.risk = 55;
+        else if (review.type === "success") review.risk = 0;
+        else review.risk = 30;
+      }
+      return review;
+    });
+    
+    const groups = countByType(pr.coderabbitReviews);
+    const confidence = computeConfidence(pr);
+    const why = computeWhyRisky(pr);
+    const fixFirst = computeFixOrder(pr);
 
-  return { ...pr, ...groups, confidence, why, fixFirst };
+    return { ...pr, ...groups, confidence, why, fixFirst };
+  } catch (error) {
+    console.error("Error processing PR:", pr.id, error);
+    // Return PR with defaults
+    return {
+      ...pr,
+      errors: [],
+      warnings: [],
+      passed: [],
+      confidence: 0,
+      why: [],
+      fixFirst: []
+    };
+  }
 }
 
 function applyFiltersAndSort(prs) {
@@ -364,10 +416,21 @@ function applyFiltersAndSort(prs) {
 
 function renderPullRequests(data) {
   const container = document.getElementById("accordion");
+  if (!container) {
+    console.error("Accordion container not found!");
+    return;
+  }
+  
   container.innerHTML = "";
 
+  console.log("Rendering PRs, data:", data);
+  console.log("Number of PRs:", data.pullRequests?.length || 0);
+
   const derived = data.pullRequests.map(getDerivedPR);
+  console.log("Derived PRs:", derived.length);
+  
   const view = applyFiltersAndSort(derived);
+  console.log("Filtered/sorted PRs:", view.length);
 
   if (!view.length) {
     container.innerHTML = `
@@ -614,7 +677,43 @@ function bindControls() {
    INIT
    ========================================================= */
 document.addEventListener("DOMContentLoaded", async () => {
+  console.log("DOM loaded, initializing...");
   bindControls();
-  state.raw = await fetchPullRequests();
-  renderPullRequests(state.raw);
+  
+  try {
+    state.raw = await fetchPullRequests();
+    console.log("State.raw:", state.raw);
+    
+    if (!state.raw || !state.raw.pullRequests) {
+      console.error("No pullRequests in response:", state.raw);
+      document.getElementById("accordion").innerHTML = `
+        <div class="rounded-lg bg-[#0f172a] border border-slate-800 p-6 text-slate-400">
+          <p>No data received from API.</p>
+          <p class="text-xs mt-2">Check console for errors.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    if (state.raw.pullRequests.length === 0) {
+      console.warn("Empty pullRequests array");
+      document.getElementById("accordion").innerHTML = `
+        <div class="rounded-lg bg-[#0f172a] border border-slate-800 p-6 text-slate-400">
+          <p>No pull requests found in results.</p>
+          <p class="text-xs mt-2">Run analysis first: python main.py owner/repo</p>
+        </div>
+      `;
+      return;
+    }
+    
+    renderPullRequests(state.raw);
+  } catch (error) {
+    console.error("Initialization error:", error);
+    document.getElementById("accordion").innerHTML = `
+      <div class="rounded-lg bg-[#0f172a] border border-red-800 p-6 text-red-400">
+        <p>Error loading data: ${error.message}</p>
+        <p class="text-xs mt-2">Check console for details.</p>
+      </div>
+    `;
+  }
 });

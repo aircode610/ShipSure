@@ -128,22 +128,67 @@ class PRProcessor:
         if 'coderabbit' not in user.lower():
             return None
         
-        # Try to extract review type and description
-        # This is a simplified extraction - you may need to enhance this
-        review_info = {
-            "name": "Coderabbit Review",
-            "type": "info",
-            "description": body[:200] + "..." if len(body) > 200 else body
-        }
+        # Try to extract review name from markdown headers or first line
+        import re
+        name = "Coderabbit Review"
         
-        # Try to detect type from content
+        # Look for markdown headers
+        header_match = re.search(r'^##\s+(.+)$', body, re.MULTILINE)
+        if header_match:
+            name = header_match.group(1).strip()
+        else:
+            # Look for bold text at start
+            bold_match = re.search(r'\*\*(.+?)\*\*', body)
+            if bold_match:
+                name = bold_match.group(1).strip()
+        
+        # Clean up name
+        name = re.sub(r'[^\w\s-]', '', name)[:50]  # Remove special chars, limit length
+        
+        # Determine type and risk
         body_lower = body.lower()
-        if any(keyword in body_lower for keyword in ['error', 'bug', 'security', 'vulnerability']):
-            review_info["type"] = "danger"
-        elif any(keyword in body_lower for keyword in ['warning', 'suggestion', 'improvement']):
-            review_info["type"] = "warning"
-        elif any(keyword in body_lower for keyword in ['good', 'approved', 'passed']):
-            review_info["type"] = "success"
+        review_type = "info"
+        risk = 0
+        
+        # Check for danger indicators
+        if any(keyword in body_lower for keyword in [
+            'error', 'bug', 'security', 'vulnerability', 'injection', 
+            'sql injection', 'xss', 'csrf', 'authentication', 'authorization'
+        ]):
+            review_type = "danger"
+            risk = 85  # Default high risk for security issues
+        elif any(keyword in body_lower for keyword in [
+            'warning', 'suggestion', 'improvement', 'potential', 'consider'
+        ]):
+            review_type = "warning"
+            risk = 55  # Default medium risk for warnings
+        elif any(keyword in body_lower for keyword in [
+            'good', 'approved', 'passed', 'success', 'build', 'lint'
+        ]):
+            review_type = "success"
+            risk = 0  # No risk for passed checks
+        
+        # Adjust risk based on severity keywords
+        if 'critical' in body_lower or 'major' in body_lower:
+            risk = max(risk, 90)
+        elif 'minor' in body_lower:
+            risk = min(risk, 40)
+        
+        # Clean description (remove markdown, limit length)
+        description = body
+        # Remove markdown code blocks
+        description = re.sub(r'```[\s\S]*?```', '', description)
+        # Remove HTML comments
+        description = re.sub(r'<!--[\s\S]*?-->', '', description)
+        # Limit length
+        description = description.strip()[:300] + "..." if len(description) > 300 else description.strip()
+        
+        review_info = {
+            "name": name or "Coderabbit Review",
+            "type": review_type,
+            "risk": risk,
+            "description": description
+        }
         
         return review_info
     

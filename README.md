@@ -1,178 +1,46 @@
-# Coderabbit Unit Test Generator Trigger
+# ShipSure - PR Risk Analysis Tool
 
-This program allows you to trigger Coderabbit's "Create PR with unit tests" feature via the GitHub API.
+ShipSure analyzes pull requests, generates tests, runs them in secure sandboxes, and provides AI-powered risk assessments.
 
 ## Features
 
-- Fetches PR information from GitHub
-- Checks if the PR has an existing Coderabbit review
-- Triggers unit test generation by posting a comment to the PR
+- 🔍 Fetches all PRs from a repository
+- 🤖 Detects Coderabbit reviews automatically
+- 🧪 Triggers unit test generation via Coderabbit
+- 🏃 Runs tests in Daytona sandbox containers
+- 🧠 GPT-powered risk analysis based on code type and test coverage
+- 📊 Beautiful frontend dashboard to visualize results
+- 📝 Complete logging of all operations
 
 ## Prerequisites
 
 1. **Python 3.7+** installed
-2. **GitHub Personal Access Token** with the following permissions:
-   - `repo` (for private repos) or `public_repo` (for public repos)
-   - `read:org` (if accessing organization repos)
-
-   Get your token from: https://github.com/settings/tokens
+2. **API Keys** (add to `.env` file):
+   - `GITHUB_TOKEN` - GitHub Personal Access Token
+   - `DAYTONA_API_KEY` - Daytona API Key
+   - `OPENAI_API_KEY` - OpenAI API Key
 
 ## Installation
 
-1. Install dependencies:
+1. **Clone/Download** this repository
+
+2. **Install dependencies**:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Set your GitHub token. You can do this in one of three ways:
-
-   **Option 1: Using .env file (Recommended)**
-   
-   Create a `.env` file in the project root and add your token:
-   ```
-   GITHUB_TOKEN=your_token_here
-   ```
-   
-   Example `.env` file:
-   ```env
-   # GitHub Personal Access Token
-   # Get your token from: https://github.com/settings/tokens
-   GITHUB_TOKEN=ghp_your_actual_token_here
-   
-   # Daytona API Key (for running tests)
-   # Get your key from: https://app.daytona.io/
-   DAYTONA_API_KEY=your_daytona_api_key_here
-   ```
-   
-   The `.env` file is automatically loaded by the scripts and is ignored by git for security.
-
-   **Option 2: Environment variable**
-   ```bash
-   # Windows (PowerShell)
-   $env:GITHUB_TOKEN="your_token_here"
-   
-   # Windows (CMD)
-   set GITHUB_TOKEN=your_token_here
-   
-   # Linux/Mac
-   export GITHUB_TOKEN="your_token_here"
-   ```
-
-   **Option 3: Command-line argument (CLI only)**
-   ```bash
-   python trigger_coderabbit_tests_cli.py owner repo 123 --token your_token_here
-   ```
+3. **Create `.env` file** in the project root:
+```env
+GITHUB_TOKEN=your_github_token_here
+DAYTONA_API_KEY=your_daytona_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+```
 
 ## Usage
 
-### Interactive Mode
+### Step 1: Run Analysis
 
-Run the interactive program:
-```bash
-python trigger_coderabbit_tests.py
-```
-
-The program will prompt you for:
-1. Repository owner (username or organization)
-2. Repository name
-3. PR number
-
-Example:
-```
-Enter repository owner (username or organization): octocat
-Enter repository name: Hello-World
-Enter PR number: 123
-```
-
-### Command-Line Mode
-
-For automation and scripting, use the CLI version:
-```bash
-python trigger_coderabbit_tests_cli.py <owner> <repo> <pr_number> [options]
-```
-
-Examples:
-```bash
-# Basic usage
-python trigger_coderabbit_tests_cli.py octocat Hello-World 123
-
-# With explicit token
-python trigger_coderabbit_tests_cli.py owner repo 456 --token ghp_xxxxx
-
-# Skip Coderabbit review check
-python trigger_coderabbit_tests_cli.py owner repo 789 --skip-check
-
-# Quiet mode (only outputs comment URL)
-python trigger_coderabbit_tests_cli.py owner repo 123 --quiet
-```
-
-Options:
-- `--token TOKEN`: GitHub personal access token (overrides .env file and GITHUB_TOKEN env var)
-- `--skip-check`: Skip checking for existing Coderabbit review
-- `--quiet, -q`: Suppress non-error output (useful for scripting)
-
-**Note:** The token is loaded in this priority order:
-1. Command-line `--token` argument (CLI only)
-2. Environment variable `GITHUB_TOKEN`
-3. `.env` file `GITHUB_TOKEN` value
-
-## How It Works
-
-1. The program fetches the PR information from GitHub
-2. It checks for existing Coderabbit reviews/comments
-3. It posts a comment `@coderabbitai generate unit tests` to trigger the unit test generation
-4. Coderabbit will process the request and generate unit tests according to your configuration
-
-## Coderabbit Configuration
-
-To customize unit test generation, create a `.coderabbit.yaml` file in your repository root:
-
-```yaml
-code_generation:
-  unit_tests:
-    path_instructions:
-      - path: "**/*.ts"
-        instructions: |
-          Use vitest for testing framework.
-          Generate comprehensive test cases including edge cases and error conditions.
-          Do not omit the imports; the test file must be valid.
-```
-
-## Notes
-
-- This feature requires Coderabbit Pro plan
-- The unit tests can be generated in:
-  - A separate pull request
-  - The same PR as a new commit
-  - As a comment with copyable code
-- Coderabbit will analyze your code and GitHub checks to ensure tests pass
-
-## Error Handling
-
-The program handles:
-- Missing GitHub token
-- Invalid PR information
-- API errors
-- Network issues
-
-## ShipSure - Main Workflow
-
-ShipSure analyzes all PRs in a repository, generates tests, runs them in Daytona, and provides risk assessments.
-
-### Prerequisites
-
-1. **GitHub Personal Access Token**: Get from https://github.com/settings/tokens
-2. **Daytona API Key**: Get from https://app.daytona.io/
-3. **OpenAI API Key**: Get from https://platform.openai.com/api-keys
-
-Add all to `.env` file:
-```env
-GITHUB_TOKEN=your_github_token
-DAYTONA_API_KEY=your_daytona_api_key
-OPENAI_API_KEY=your_openai_api_key
-```
-
-### Usage
+Analyze PRs in a repository:
 
 ```bash
 # Analyze all open PRs
@@ -184,33 +52,49 @@ python main.py owner/repo --state closed
 # Analyze all PRs (open + closed)
 python main.py owner/repo --state all
 
-# Limit number of PRs to process
+# Limit number of PRs
 python main.py owner/repo --max-prs 10
 
-# Skip test generation/execution (faster, GPT analysis only)
+# Skip test execution (GPT analysis only)
 python main.py owner/repo --skip-tests
 
 # Skip GPT analysis (tests only)
 python main.py owner/repo --skip-gpt
-
-# Custom output directory
-python main.py owner/repo --output-dir my_results
 ```
 
-### How It Works
+**Example**:
+```bash
+python main.py aircode610/startup
+```
 
-1. **Fetches all PRs** from the repository
-2. **For each PR**:
-   - Checks for Coderabbit reviews
-   - Triggers unit test generation via Coderabbit
-   - Runs tests in Daytona sandbox
-   - Analyzes results with GPT API for risk assessment
-3. **Generates JSON output** with risk scores, test results, and analysis
-4. **Saves results** to `output/` directory with timestamps
+This will:
+1. Fetch all PRs from the repository
+2. For each PR:
+   - Check for Coderabbit reviews
+   - Trigger unit test generation
+   - Run tests in Daytona
+   - Analyze with GPT for risk assessment
+3. Save results to `output/results_YYYYMMDD_HHMMSS.json`
+4. Save logs to `output/logs/shipSure_YYYYMMDD_HHMMSS.log`
 
-### Output Structure
+### Step 2: View Results in Frontend
 
-Results are saved as JSON files in the output directory:
+Start the web server:
+
+```bash
+python server.py
+```
+
+Then open your browser to:
+```
+http://localhost:5000
+```
+
+The frontend will automatically load the latest results and display them in an interactive dashboard.
+
+## Output Format
+
+Results are saved as JSON with this structure:
 
 ```json
 {
@@ -222,17 +106,90 @@ Results are saved as JSON files in the output directory:
       "title": "Fix auth bypass in login",
       "link": "https://github.com/org/repo/pull/42",
       "risk": 85,
-      "coderabbitReviews": [...],
-      "generatedTests": [...],
-      "testResults": {...}
+      "coderabbitReviews": [
+        {
+          "name": "SQL Injection check",
+          "type": "danger",
+          "risk": 85,
+          "description": "Unsafe query construction detected"
+        }
+      ],
+      "generatedTests": [
+        {
+          "test": "Expired Token Validation",
+          "reason": "Auth expiry path lacks coverage"
+        }
+      ],
+      "testResults": {
+        "status": "passed",
+        "exitCode": 0,
+        "output": "..."
+      }
     }
   ]
 }
 ```
 
-### Logs
+## Project Structure
 
-All operations are logged to `output/logs/` directory with timestamps.
+```
+ShipSure/
+├── main.py              # Main orchestrator
+├── server.py            # Flask server for frontend
+├── pr_processor.py      # PR processing logic
+├── test_runner.py       # Daytona test execution
+├── gpt_analyzer.py     # GPT risk analysis
+├── github_client.py    # GitHub API client
+├── run_tests_daytona.py # Detailed test runner
+├── front-end/          # Frontend dashboard
+│   ├── index.html
+│   └── app.js
+├── output/             # Generated results (auto-created)
+│   ├── results_*.json
+│   └── logs/
+└── .env                # API keys (create this)
+```
+
+## How It Works
+
+1. **PR Fetching**: Gets all PRs from the repository
+2. **Coderabbit Detection**: Checks for existing Coderabbit reviews
+3. **Test Generation**: Triggers `@coderabbitai generate unit tests` comment
+4. **Test Execution**: 
+   - Fetches code and test files from PRs
+   - Creates Daytona sandbox
+   - Installs dependencies (pytest, etc.)
+   - Runs tests and captures output
+5. **Risk Analysis**: 
+   - Analyzes code type (auth/DB = critical)
+   - Evaluates test coverage
+   - Calculates risk scores (0-100)
+   - Determines confidence levels
+6. **Visualization**: Frontend displays results with filtering and sorting
+
+## Risk Assessment
+
+- **Critical (80-100)**: Authentication, database operations, payment processing
+- **High (60-79)**: API endpoints, data validation, file operations
+- **Medium (40-59)**: Business logic, utilities, helpers
+- **Low (0-39)**: UI changes, documentation, configuration
+
+## Troubleshooting
+
+### No results in frontend
+- Make sure you've run `python main.py owner/repo` first
+- Check that `output/results_*.json` files exist
+- Check server logs for errors
+
+### Tests failing
+- Ensure Daytona API key is valid
+- Check that pytest is installing correctly
+- Review test output in logs
+
+### GPT analysis errors
+- Verify OpenAI API key is set
+- Check API quota/limits
+- Review error messages in logs
 
 ## License
 

@@ -21,7 +21,6 @@ class GPTAnalyzer:
             raise ValueError(
                 "OpenAI API key is required. Set OPENAI_API_KEY in .env file or environment variable."
             )
-        openai.api_key = self.api_key
         self.client = openai.OpenAI(api_key=self.api_key)
     
     def analyze_pr(
