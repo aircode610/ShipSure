@@ -2,82 +2,69 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Pull Request Risk Dashboard</title>
-
-    <!-- Tailwind CSS CDN -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PR Risk Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
 
-  <body class="bg-[#0b1220] text-slate-200 min-h-screen p-16 w-screen">
-    <div class="max-w-5xl mx-auto">
-      <h1 class="text-3xl font-semibold mb-6 text-emerald-400">
-        Pull Request Risk Overview
-      </h1>
+  <body class="bg-[#0b1220] text-slate-200 min-h-screen">
+    <div class="max-w-6xl mx-auto p-6">
+      <!-- ===== PAGE HEADER ===== -->
+      <header class="mb-4">
+        <h1 class="text-3xl font-semibold text-emerald-400">
+          PR Risk Intelligence
+        </h1>
+        <p class="text-sm text-slate-400 mt-1">
+          Prioritize risk • explain why • fix first
+        </p>
+      </header>
 
-      <!-- Accordion Container -->
-      <div id="accordion" class="space-y-3"></div>
-    </div>
-    <!DOCTYPE html>
-    <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Pull Request Risk Intelligence</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-      </head>
+      <!-- ===== MAIN SECTION (LIST IS THE HERO) ===== -->
+      <main class="space-y-3">
+        <!-- ===== LIST CONTAINER (CONTROLS + PRs) ===== -->
+        <section class="rounded-lg bg-[#0f172a] border border-slate-800">
+          <!-- Inline List Controls (Merged into main list) -->
+          <div
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-slate-800">
+            <!-- Left: Context label -->
+            <div class="text-sm text-slate-400">Pull Requests</div>
 
-      <body class="bg-[#0b1220] text-slate-200 min-h-screen">
-        <div class="max-w-6xl mx-auto p-6">
-          <header
-            class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-6">
-            <div>
-              <h1 class="text-3xl font-semibold text-emerald-400">
-                PR Risk Intelligence
-              </h1>
-              <p class="text-sm text-slate-400 mt-1">
-                Prioritize risk • explain why • fix first
-              </p>
-            </div>
-
-            <div class="flex flex-col md:flex-row gap-3 md:items-center">
+            <!-- Right: Controls -->
+            <div class="flex flex-wrap items-center gap-4">
               <label
                 class="flex items-center gap-2 text-sm text-slate-300 select-none">
                 <input
                   id="highRiskOnly"
                   type="checkbox"
                   class="accent-emerald-400 w-4 h-4" />
-                Show only High Risk
+                High Risk only
               </label>
 
               <div class="flex items-center gap-2">
-                <span class="text-sm text-slate-400">Sort:</span>
+                <span class="text-sm text-slate-400">Sort</span>
                 <select
                   id="sortMode"
-                  class="bg-[#0f172a] border border-slate-800 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
-                  <option value="risk_desc">Risk (High → Low)</option>
-                  <option value="errors_desc">Errors (Most → Least)</option>
-                  <option value="warnings_desc">Warnings (Most → Least)</option>
-                  <option value="confidence_desc">
-                    Confidence (High → Low)
-                  </option>
+                  class="bg-[#0b1220] border border-slate-800 rounded-md px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
+                  <option value="risk_desc">Risk ↓</option>
+                  <option value="errors_desc">Errors ↓</option>
+                  <option value="warnings_desc">Warnings ↓</option>
+                  <option value="confidence_desc">Confidence ↓</option>
                 </select>
               </div>
             </div>
-          </header>
+          </div>
 
-          <div id="accordion" class="space-y-3"></div>
+          <!-- PR ACCORDION LIST (TOP OF MAIN CONTENT) -->
+          <div id="accordion" class="space-y-3 p-3"></div>
+        </section>
+      </main>
 
-          <footer class="mt-10 text-xs text-slate-500">
-            UI is fully JSON-driven. Most “intelligence” is computed client-side
-            for hackathon speed.
-          </footer>
-        </div>
+      <footer class="mt-8 text-xs text-slate-500">
+        Risk intelligence and prioritization are derived client-side from
+        analysis output.
+      </footer>
+    </div>
 
-        <script src="app.js"></script>
-      </body>
-    </html>
-
-    <!-- App Logic -->
     <script src="app.js"></script>
   </body>
 </html>
