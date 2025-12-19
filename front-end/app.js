@@ -353,6 +353,41 @@ function renderSection(title, items, kind) {
   `;
 }
 
+function renderGeneratedTestsAccordion(tests) {
+  const testCount = tests.length;
+  const testListHtml = tests.length
+    ? tests
+        .map(
+          (t) => `
+        <li class="p-3 rounded bg-[#0b1220] border border-slate-800">
+          <div class="font-medium text-slate-200">${t.test}</div>
+          <p class="text-sm text-slate-400 mt-1">Reason: ${t.reason}</p>
+        </li>
+      `
+        )
+        .join("")
+    : `
+    <li class="p-3 rounded bg-[#0b1220] border border-slate-800 text-sm text-slate-400">
+      No generated tests.
+    </li>
+  `;
+
+  return `
+    <section class="space-y-2">
+      <button class="w-full flex items-center justify-between p-3 rounded-lg bg-[#0b1220] border border-slate-800 hover:bg-slate-800/30 transition text-left"
+              data-test-toggle aria-expanded="false">
+        <h3 class="text-sm font-semibold text-slate-300">
+          🧪 Generated Tests <span class="text-slate-500">(${testCount})</span>
+        </h3>
+        <span class="text-slate-400 text-xs transition-transform" data-test-arrow>▼</span>
+      </button>
+      <div class="test-accordion-content overflow-hidden max-h-0 opacity-0 transition-[max-height,opacity] duration-300 ease-in-out">
+        <ul class="space-y-2 pl-2">${testListHtml}</ul>
+      </div>
+    </section>
+  `;
+}
+
 /* =========================================================
    RENDER MAIN
    ========================================================= */
@@ -568,44 +603,18 @@ function renderPullRequests(data) {
             ${fixHtml}
           </div>
 
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div class="lg:col-span-2 space-y-4">
-              ${renderSection("❌ Errors", pr.errors, "risk")}
-              ${renderSection("⚠️ Warnings", pr.warnings, "risk")}
-              ${renderSection("✅ Passed Tests", pr.passed, "passed")}
-            </div>
+          <div class="space-y-4">
+            ${renderSection("❌ Errors", pr.errors, "risk")}
+            ${renderGeneratedTestsAccordion(pr.generatedTests || [])}
+            ${renderSection("⚠️ Warnings", pr.warnings, "risk")}
+            ${renderSection("✅ Passed Tests", pr.passed, "passed")}
+          </div>
 
-            <div class="space-y-2">
-              <h3 class="text-sm font-semibold text-slate-300">Generated Tests</h3>
-              <ul class="space-y-2">
-                ${(pr.generatedTests || [])
-                  .map(
-                    (t) => `
-                  <li class="p-3 rounded bg-[#0b1220] border border-slate-800">
-                    <div class="font-medium">${t.test}</div>
-                    <p class="text-sm text-slate-400 mt-1">Reason: ${t.reason}</p>
-                  </li>
-                `
-                  )
-                  .join("")}
-                ${
-                  !pr.generatedTests || pr.generatedTests.length === 0
-                    ? `
-                  <li class="p-3 rounded bg-[#0b1220] border border-slate-800 text-sm text-slate-400">
-                    No generated tests.
-                  </li>
-                `
-                    : ""
-                }
-              </ul>
-
-              <div class="pt-2">
-                <a href="${pr.link}" target="_blank"
-                   class="inline-flex items-center gap-2 text-sm text-emerald-400 hover:underline">
-                  Open PR <span class="text-slate-500">→</span>
-                </a>
-              </div>
-            </div>
+          <div class="pt-2 border-t border-slate-800">
+            <a href="${pr.link}" target="_blank"
+               class="inline-flex items-center gap-2 text-sm text-emerald-400 hover:underline">
+              Open PR <span class="text-slate-500">→</span>
+            </a>
           </div>
 
         </div>
@@ -645,12 +654,34 @@ function closeAccordion(btn, content) {
 }
 
 function attachAccordionHandlers() {
+  // Main PR accordion handlers
   document.querySelectorAll("[data-toggle]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const content = btn.nextElementSibling;
       const expanded = btn.getAttribute("aria-expanded") === "true";
       if (expanded) closeAccordion(btn, content);
       else openAccordion(btn, content);
+    });
+  });
+
+  // Generated Tests accordion handlers
+  document.querySelectorAll("[data-test-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const content = btn.nextElementSibling;
+      const arrow = btn.querySelector("[data-test-arrow]");
+      const expanded = btn.getAttribute("aria-expanded") === "true";
+      
+      if (expanded) {
+        btn.setAttribute("aria-expanded", "false");
+        content.classList.add("max-h-0", "opacity-0");
+        content.classList.remove("opacity-100", "max-h-[1000px]");
+        if (arrow) arrow.style.transform = "rotate(0deg)";
+      } else {
+        btn.setAttribute("aria-expanded", "true");
+        content.classList.remove("max-h-0", "opacity-0");
+        content.classList.add("opacity-100", "max-h-[1000px]");
+        if (arrow) arrow.style.transform = "rotate(180deg)";
+      }
     });
   });
 }
