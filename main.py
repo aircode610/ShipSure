@@ -123,6 +123,38 @@ def main():
         else:
             prs = github_client.list_prs(owner, repo, state=args.state)
         
+        # Filter out test PRs (PRs created by Coderabbit for unit tests)
+        def is_test_pr(pr: Dict) -> bool:
+            """Check if a PR is a test PR created by Coderabbit"""
+            title = pr.get('title', '').lower()
+            body = pr.get('body', '').lower()
+            user = pr.get('user', {}).get('login', '').lower()
+            
+            # Check if it's created by Coderabbit/bot
+            if 'coderabbit' in user or 'bot' in user:
+                # Check for test-related keywords in title
+                test_keywords = [
+                    'coderabbit generated unit tests',
+                    'generated unit tests',
+                    'unit test',
+                    'test for pr',
+                    'test suite for',
+                    'comprehensive test suite'
+                ]
+                if any(keyword in title for keyword in test_keywords):
+                    return True
+            
+            return False
+        
+        # Filter out test PRs
+        original_prs = [pr for pr in prs if not is_test_pr(pr)]
+        filtered_count = len(prs) - len(original_prs)
+        
+        if filtered_count > 0:
+            logger.info(f"Filtered out {filtered_count} test PR(s) (Coderabbit generated)")
+        
+        prs = original_prs
+        
         if args.max_prs:
             prs = prs[:args.max_prs]
         
