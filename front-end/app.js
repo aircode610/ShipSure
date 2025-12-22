@@ -1,22 +1,137 @@
 /* =========================================================
-   BACKEND FETCH
-   Sends credentials to backend and expects { pullRequests: [...] }
+   FETCH FROM API
    ========================================================= */
-async function fetchPullRequests(payload) {
-  const response = await fetch("/api/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Backend error (${response.status}): ${errorText || "Unknown error"}`
-    );
+async function fetchPullRequests() {
+  try {
+    console.log("Fetching PRs from /api/pull-requests...");
+    const response = await fetch("/api/pull-requests");
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API error:", response.status, errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log("Fetched data:", data);
+    console.log(`Found ${data.pullRequests?.length || 0} PR(s)`);
+    return data;
+  } catch (error) {
+    console.error("Error fetching PRs:", error);
+    // Fallback to empty data on error
+    return { pullRequests: [] };
   }
+}
 
-  return response.json();
+/* =========================================================
+   MOCK DATA (FALLBACK - NOT USED IN PRODUCTION)
+   ========================================================= */
+function getMockData() {
+  return {
+    pullRequests: [
+      {
+        id: 1,
+        title: "Fix auth bypass in login",
+        link: "https://github.com/org/repo/pull/42",
+        risk: 78,
+        coderabbitReviews: [
+          {
+            name: "SQL Injection test",
+            type: "danger",
+            risk: 85,
+            description:
+              "Potential unsafe query detected in data access layer.",
+          },
+          {
+            name: "Auth edge case test",
+            type: "warning",
+            risk: 55,
+            description: "Token expiry edge case not fully covered.",
+          },
+          {
+            name: "Login happy path",
+            type: "success",
+            description: "Basic login flow passed.",
+          },
+          {
+            name: "Session invalidation",
+            type: "success",
+            description: "Logout invalidates session.",
+          },
+        ],
+        generatedTests: [
+          {
+            test: "Expired JWT validation",
+            reason: "Auth middleware did not handle expired tokens.",
+          },
+          {
+            test: "Malformed payload test",
+            reason: "Missing schema validation for login payload.",
+          },
+        ],
+      },
+      {
+        id: 2,
+        title: "Refactor dashboard UI components",
+        link: "https://github.com/org/repo/pull/51",
+        risk: 28,
+        coderabbitReviews: [
+          {
+            name: "Snapshot stability",
+            type: "warning",
+            risk: 42,
+            description: "Snapshot test might be brittle after layout changes.",
+          },
+          {
+            name: "Build pipeline",
+            type: "success",
+            description: "Build and lint passed.",
+          },
+          {
+            name: "UI regression suite",
+            type: "success",
+            description: "Core UI flows passed.",
+          },
+        ],
+        generatedTests: [
+          {
+            test: "Visual regression for sidebar",
+            reason: "Large UI refactor changed layout structure.",
+          },
+        ],
+      },
+      {
+        id: 3,
+        title: "Optimize query + caching layer",
+        link: "https://github.com/org/repo/pull/63",
+        risk: 66,
+        coderabbitReviews: [
+          {
+            name: "N+1 query detection",
+            type: "warning",
+            risk: 62,
+            description: "Potential N+1 pattern if cache misses.",
+          },
+          {
+            name: "Cache invalidation",
+            type: "warning",
+            risk: 58,
+            description:
+              "Invalidate key strategy unclear under concurrent writes.",
+          },
+          {
+            name: "Perf baseline",
+            type: "success",
+            description: "Perf tests improved vs baseline.",
+          },
+        ],
+        generatedTests: [
+          {
+            test: "Concurrent invalidation test",
+            reason: "Caching logic may break under concurrent writes.",
+          },
+        ],
+      },
+    ],
+  };
 }
 
 /* =========================================================
@@ -285,26 +400,100 @@ function renderSection(title, items, kind) {
   `;
 }
 
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function renderGeneratedTestsAccordion(tests) {
+  const testCount = tests.length;
+  const testListHtml = tests.length
+    ? tests
+        .map(
+          (t) => {
+            const testCode = t.code ? `
+          <details class="mt-2">
+            <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-400">
+              View Test Code
+            </summary>
+            <pre class="mt-2 p-2 bg-[#0a0f1a] border border-slate-700 rounded text-xs text-slate-300 overflow-x-auto"><code>${escapeHtml(t.code)}</code></pre>
+          </details>
+        ` : '';
+            return `
+        <li class="p-3 rounded bg-[#0b1220] border border-slate-800">
+          <div class="font-medium text-slate-200">${t.test}</div>
+          <p class="text-sm text-slate-400 mt-1">Reason: ${t.reason || 'Generated by Coderabbit'}</p>
+          ${testCode}
+        </li>
+      `;
+          }
+        )
+        .join("")
+    : `
+    <li class="p-3 rounded bg-[#0b1220] border border-slate-800 text-sm text-slate-400">
+      No generated tests.
+    </li>
+  `;
+
+  return `
+    <section class="space-y-2">
+      <button class="w-full flex items-center justify-between p-3 rounded-lg bg-[#0b1220] border border-slate-800 hover:bg-slate-800/30 transition text-left"
+              data-test-toggle aria-expanded="false">
+        <h3 class="text-sm font-semibold text-slate-300">
+          🧪 Generated Tests <span class="text-slate-500">(${testCount})</span>
+        </h3>
+        <span class="text-slate-400 text-xs transition-transform" data-test-arrow>▼</span>
+      </button>
+      <div class="test-accordion-content overflow-hidden max-h-0 opacity-0 transition-[max-height,opacity] duration-300 ease-in-out">
+        <ul class="space-y-2 pl-2">${testListHtml}</ul>
+      </div>
+    </section>
+  `;
+}
+
 /* =========================================================
    RENDER MAIN
    ========================================================= */
 function getDerivedPR(pr) {
-  const coderabbitReviews = pr.coderabbitReviews || [];
-  const generatedTests = pr.generatedTests || [];
-  const groups = countByType(coderabbitReviews);
-  const confidence = computeConfidence(pr);
-  const why = computeWhyRisky(pr);
-  const fixFirst = computeFixOrder(pr);
+  try {
+    // Ensure coderabbitReviews exists and is an array
+    if (!pr.coderabbitReviews) {
+      pr.coderabbitReviews = [];
+    }
+    
+    // Ensure all reviews have required fields
+    pr.coderabbitReviews = pr.coderabbitReviews.map(review => {
+      if (!review.risk && review.risk !== 0) {
+        // Set default risk based on type
+        if (review.type === "danger") review.risk = 85;
+        else if (review.type === "warning") review.risk = 55;
+        else if (review.type === "success") review.risk = 0;
+        else review.risk = 30;
+      }
+      return review;
+    });
+    
+    const groups = countByType(pr.coderabbitReviews);
+    const confidence = computeConfidence(pr);
+    const why = computeWhyRisky(pr);
+    const fixFirst = computeFixOrder(pr);
 
-  return {
-    ...pr,
-    coderabbitReviews,
-    generatedTests,
-    ...groups,
-    confidence,
-    why,
-    fixFirst,
-  };
+    return { ...pr, ...groups, confidence, why, fixFirst };
+  } catch (error) {
+    console.error("Error processing PR:", pr.id, error);
+    // Return PR with defaults
+    return {
+      ...pr,
+      errors: [],
+      warnings: [],
+      passed: [],
+      confidence: 0,
+      why: [],
+      fixFirst: []
+    };
+  }
 }
 
 function applyFiltersAndSort(prs) {
@@ -327,20 +516,21 @@ function applyFiltersAndSort(prs) {
 
 function renderPullRequests(data) {
   const container = document.getElementById("accordion");
-  container.innerHTML = "";
-
-  const dataset = Array.isArray(data?.pullRequests) ? data.pullRequests : [];
-  if (dataset.length === 0) {
-    container.innerHTML = `
-      <div class="rounded-lg bg-[#0f172a] border border-slate-800 p-6 text-slate-400">
-        No pull requests loaded. Enter your credentials above and click Analyze.
-      </div>
-    `;
+  if (!container) {
+    console.error("Accordion container not found!");
     return;
   }
+  
+  container.innerHTML = "";
+  
+  console.log("Rendering PRs, data:", data);
+  console.log("Number of PRs:", data.pullRequests?.length || 0);
 
-  const derived = dataset.map(getDerivedPR);
+  const derived = data.pullRequests.map(getDerivedPR);
+  console.log("Derived PRs:", derived.length);
+  
   const view = applyFiltersAndSort(derived);
+  console.log("Filtered/sorted PRs:", view.length);
 
   if (!view.length) {
     container.innerHTML = `
@@ -478,44 +668,18 @@ function renderPullRequests(data) {
             ${fixHtml}
           </div>
 
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div class="lg:col-span-2 space-y-4">
-              ${renderSection("❌ Errors", pr.errors, "risk")}
-              ${renderSection("⚠️ Warnings", pr.warnings, "risk")}
-              ${renderSection("✅ Passed Tests", pr.passed, "passed")}
-            </div>
+          <div class="space-y-4">
+            ${renderSection("❌ Errors", pr.errors, "risk")}
+            ${renderGeneratedTestsAccordion(pr.generatedTests || [])}
+            ${renderSection("⚠️ Warnings", pr.warnings, "risk")}
+            ${renderSection("✅ Passed Tests", pr.passed, "passed")}
+          </div>
 
-            <div class="space-y-2">
-              <h3 class="text-sm font-semibold text-slate-300">Generated Tests</h3>
-              <ul class="space-y-2">
-                ${(pr.generatedTests || [])
-                  .map(
-                    (t) => `
-                  <li class="p-3 rounded bg-[#0b1220] border border-slate-800">
-                    <div class="font-medium">${t.test}</div>
-                    <p class="text-sm text-slate-400 mt-1">Reason: ${t.reason}</p>
-                  </li>
-                `
-                  )
-                  .join("")}
-                ${
-                  !pr.generatedTests || pr.generatedTests.length === 0
-                    ? `
-                  <li class="p-3 rounded bg-[#0b1220] border border-slate-800 text-sm text-slate-400">
-                    No generated tests.
-                  </li>
-                `
-                    : ""
-                }
-              </ul>
-
-              <div class="pt-2">
-                <a href="${pr.link}" target="_blank"
-                   class="inline-flex items-center gap-2 text-sm text-emerald-400 hover:underline">
-                  Open PR <span class="text-slate-500">→</span>
-                </a>
-              </div>
-            </div>
+          <div class="pt-2 border-t border-slate-800">
+            <a href="${pr.link}" target="_blank"
+               class="inline-flex items-center gap-2 text-sm text-emerald-400 hover:underline">
+              Open PR <span class="text-slate-500">→</span>
+            </a>
           </div>
 
         </div>
@@ -651,12 +815,34 @@ function closeAccordion(btn, content) {
 }
 
 function attachAccordionHandlers() {
+  // Main PR accordion handlers
   document.querySelectorAll("[data-toggle]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const content = btn.nextElementSibling;
       const expanded = btn.getAttribute("aria-expanded") === "true";
       if (expanded) closeAccordion(btn, content);
       else openAccordion(btn, content);
+    });
+  });
+
+  // Generated Tests accordion handlers
+  document.querySelectorAll("[data-test-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const content = btn.nextElementSibling;
+      const arrow = btn.querySelector("[data-test-arrow]");
+      const expanded = btn.getAttribute("aria-expanded") === "true";
+      
+      if (expanded) {
+        btn.setAttribute("aria-expanded", "false");
+        content.classList.add("max-h-0", "opacity-0");
+        content.classList.remove("opacity-100", "max-h-[1000px]");
+        if (arrow) arrow.style.transform = "rotate(0deg)";
+      } else {
+        btn.setAttribute("aria-expanded", "true");
+        content.classList.remove("max-h-0", "opacity-0");
+        content.classList.add("opacity-100", "max-h-[1000px]");
+        if (arrow) arrow.style.transform = "rotate(180deg)";
+      }
     });
   });
 }
@@ -683,12 +869,44 @@ function bindControls() {
 /* =========================================================
    INIT
    ========================================================= */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  console.log("DOM loaded, initializing...");
   bindControls();
-  bindAnalyze();
-  setStatus(
-    "info",
-    "Showing demo data. Provide your tokens and click Analyze to fetch live pull request insights."
-  );
-  renderPullRequests(state.raw);
+  
+  try {
+    state.raw = await fetchPullRequests();
+    console.log("State.raw:", state.raw);
+    
+    if (!state.raw || !state.raw.pullRequests) {
+      console.error("No pullRequests in response:", state.raw);
+      document.getElementById("accordion").innerHTML = `
+        <div class="rounded-lg bg-[#0f172a] border border-slate-800 p-6 text-slate-400">
+          <p>No data received from API.</p>
+          <p class="text-xs mt-2">Check console for errors.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    if (state.raw.pullRequests.length === 0) {
+      console.warn("Empty pullRequests array");
+      document.getElementById("accordion").innerHTML = `
+        <div class="rounded-lg bg-[#0f172a] border border-slate-800 p-6 text-slate-400">
+          <p>No pull requests found in results.</p>
+          <p class="text-xs mt-2">Run analysis first: python main.py owner/repo</p>
+        </div>
+      `;
+      return;
+    }
+    
+    renderPullRequests(state.raw);
+  } catch (error) {
+    console.error("Initialization error:", error);
+    document.getElementById("accordion").innerHTML = `
+      <div class="rounded-lg bg-[#0f172a] border border-red-800 p-6 text-red-400">
+        <p>Error loading data: ${error.message}</p>
+        <p class="text-xs mt-2">Check console for details.</p>
+      </div>
+    `;
+  }
 });
