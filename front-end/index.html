@@ -3,48 +3,125 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="icon.png" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet" />
     <title>PR Risk Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="app.css" />
   </head>
 
-  <body class="bg-[#0b1220] text-slate-200 min-h-screen">
-    <div class="max-w-6xl mx-auto p-6">
+  <body class="text-slate-200 min-h-screen">
+    <div class="fixed inset-0 pointer-events-none scanline"></div>
+    <div class="max-w-6xl mx-auto p-6 relative">
       <!-- ===== PAGE HEADER ===== -->
-      <header class="mb-4">
-        <h1 class="text-3xl font-semibold text-emerald-400">
-          PR Risk Intelligence
-        </h1>
-        <p class="text-sm text-slate-400 mt-1">
-          Prioritize risk • explain why • fix first
-        </p>
+      <header class="mb-4 flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-semibold text-emerald-300 glow-text">
+            PR Risk Intelligence
+          </h1>
+          <p class="text-xs text-cyan-200/70 mt-1 tracking-wide">
+            Prioritize risk • explain why • fix first • cyber mode
+          </p>
+        </div>
+        <div class="text-right text-[11px] text-slate-400">
+          <div class="uppercase tracking-[0.2em] text-cyan-300">
+            Secure Stack
+          </div>
+          <div class="text-slate-500">v1.0 • live telemetry</div>
+        </div>
       </header>
+
+      <!-- ===== CREDENTIAL INPUTS ===== -->
+      <section class="mb-4">
+        <div class="cyber-card cyber-border rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 class="text-sm font-semibold text-emerald-300 glow-text">
+                Analysis Credentials
+              </h2>
+              <p class="text-xs text-slate-400">
+                Authenticate the pipeline and launch a new scan.
+              </p>
+            </div>
+            <button
+              id="analyzeBtn"
+              class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-emerald-500 to-cyan-400 text-slate-900 px-4 py-2 text-sm font-semibold hover:from-emerald-400 hover:to-cyan-300 transition disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_0_18px_rgba(52,211,153,0.45)]">
+              Analyze ▷
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <label class="space-y-1 block text-sm">
+              <span class="text-emerald-200">GitHub Token</span>
+              <input
+                id="githubToken"
+                type="password"
+                placeholder="GITHUB_TOKEN=your_github_token_here"
+                class="w-full bg-[#060c17] border border-cyan-500/30 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 placeholder:text-slate-500" />
+            </label>
+
+            <label class="space-y-1 block text-sm">
+              <span class="text-emerald-200">Daytona API Key</span>
+              <input
+                id="daytonaApiKey"
+                type="password"
+                placeholder="DAYTONA_API_KEY=your_daytona_api_key_here"
+                class="w-full bg-[#060c17] border border-cyan-500/30 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 placeholder:text-slate-500" />
+            </label>
+
+            <label class="space-y-1 block text-sm">
+              <span class="text-emerald-200">OpenAI API Key</span>
+              <input
+                id="openaiApiKey"
+                type="password"
+                placeholder="OPENAI_API_KEY=your_openai_api_key_here"
+                class="w-full bg-[#060c17] border border-cyan-500/30 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 placeholder:text-slate-500" />
+            </label>
+          </div>
+
+          <div
+            id="analysisStatus"
+            class="text-xs text-cyan-200 bg-[#060c17] border border-cyan-500/30 rounded-md px-3 py-2 shadow-[0_0_12px_rgba(34,211,238,0.25)]">
+            Provide your tokens and click Analyze to fetch pull request
+            insights.
+          </div>
+
+          <div id="progressContainer" class="progress-track h-2 hidden">
+            <div id="progressFill" class="progress-bar"></div>
+          </div>
+        </div>
+      </section>
 
       <!-- ===== MAIN SECTION (LIST IS THE HERO) ===== -->
       <main class="space-y-3">
         <!-- ===== LIST CONTAINER (CONTROLS + PRs) ===== -->
-        <section class="rounded-lg bg-[#0f172a] border border-slate-800">
+        <section class="rounded-xl cyber-card cyber-border">
           <!-- Inline List Controls (Merged into main list) -->
           <div
-            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-slate-800">
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-cyan-500/30">
             <!-- Left: Context label -->
-            <div class="text-sm text-slate-400">Pull Requests</div>
+            <div class="text-sm text-cyan-200 uppercase tracking-[0.15em]">
+              Pull Requests
+            </div>
 
             <!-- Right: Controls -->
             <div class="flex flex-wrap items-center gap-4">
               <label
-                class="flex items-center gap-2 text-sm text-slate-300 select-none">
+                class="flex items-center gap-2 text-sm text-emerald-200 select-none">
                 <input
                   id="highRiskOnly"
                   type="checkbox"
-                  class="accent-emerald-400 w-4 h-4" />
+                  class="accent-emerald-400 w-4 h-4 bg-[#060c17] border border-cyan-500/40" />
                 High Risk only
               </label>
 
               <div class="flex items-center gap-2">
-                <span class="text-sm text-slate-400">Sort</span>
+                <span class="text-sm text-cyan-200">Sort</span>
                 <select
                   id="sortMode"
-                  class="bg-[#0b1220] border border-slate-800 rounded-md px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
+                  class="bg-[#060c17] border border-cyan-500/40 rounded-md px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
                   <option value="risk_desc">Risk ↓</option>
                   <option value="errors_desc">Errors ↓</option>
                   <option value="warnings_desc">Warnings ↓</option>

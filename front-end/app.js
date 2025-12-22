@@ -1,125 +1,76 @@
 /* =========================================================
-   MOCK BACKEND
-   Replace fetchPullRequests() with:
-   fetch("/api/pull-requests").then(r => r.json())
+   BACKEND FETCH
+   Sends credentials to backend and expects { pullRequests: [...] }
    ========================================================= */
-function fetchPullRequests() {
-  return Promise.resolve({
-    pullRequests: [
-      {
-        id: 1,
-        title: "Fix auth bypass in login",
-        link: "https://github.com/org/repo/pull/42",
-        risk: 78,
-        coderabbitReviews: [
-          {
-            name: "SQL Injection test",
-            type: "danger",
-            risk: 85,
-            description:
-              "Potential unsafe query detected in data access layer.",
-          },
-          {
-            name: "Auth edge case test",
-            type: "warning",
-            risk: 55,
-            description: "Token expiry edge case not fully covered.",
-          },
-          {
-            name: "Login happy path",
-            type: "success",
-            description: "Basic login flow passed.",
-          },
-          {
-            name: "Session invalidation",
-            type: "success",
-            description: "Logout invalidates session.",
-          },
-        ],
-        generatedTests: [
-          {
-            test: "Expired JWT validation",
-            reason: "Auth middleware did not handle expired tokens.",
-          },
-          {
-            test: "Malformed payload test",
-            reason: "Missing schema validation for login payload.",
-          },
-        ],
-      },
-      {
-        id: 2,
-        title: "Refactor dashboard UI components",
-        link: "https://github.com/org/repo/pull/51",
-        risk: 28,
-        coderabbitReviews: [
-          {
-            name: "Snapshot stability",
-            type: "warning",
-            risk: 42,
-            description: "Snapshot test might be brittle after layout changes.",
-          },
-          {
-            name: "Build pipeline",
-            type: "success",
-            description: "Build and lint passed.",
-          },
-          {
-            name: "UI regression suite",
-            type: "success",
-            description: "Core UI flows passed.",
-          },
-        ],
-        generatedTests: [
-          {
-            test: "Visual regression for sidebar",
-            reason: "Large UI refactor changed layout structure.",
-          },
-        ],
-      },
-      {
-        id: 3,
-        title: "Optimize query + caching layer",
-        link: "https://github.com/org/repo/pull/63",
-        risk: 66,
-        coderabbitReviews: [
-          {
-            name: "N+1 query detection",
-            type: "warning",
-            risk: 62,
-            description: "Potential N+1 pattern if cache misses.",
-          },
-          {
-            name: "Cache invalidation",
-            type: "warning",
-            risk: 58,
-            description:
-              "Invalidate key strategy unclear under concurrent writes.",
-          },
-          {
-            name: "Perf baseline",
-            type: "success",
-            description: "Perf tests improved vs baseline.",
-          },
-        ],
-        generatedTests: [
-          {
-            test: "Concurrent invalidation test",
-            reason: "Caching logic may break under concurrent writes.",
-          },
-        ],
-      },
-    ],
+async function fetchPullRequests(payload) {
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Backend error (${response.status}): ${errorText || "Unknown error"}`
+    );
+  }
+
+  return response.json();
 }
+
+/* =========================================================
+   DEMO DATA (used before first analysis for UI development)
+   ========================================================= */
+const DEMO_DATA = {
+  pullRequests: [
+    {
+      id: "demo-1",
+      title: "Harden onboarding OAuth + audit logging",
+      link: "#",
+      risk: 72,
+      coderabbitReviews: [
+        {
+          name: "Token leakage check",
+          type: "danger",
+          risk: 84,
+          description: "OAuth callback path can log sensitive params.",
+        },
+        {
+          name: "PII masking",
+          type: "warning",
+          risk: 55,
+          description: "Audit log omits masking on email + phone.",
+        },
+        {
+          name: "Happy path tests",
+          type: "success",
+          description: "Primary OAuth flow passes regression suite.",
+        },
+      ],
+      generatedTests: [
+        {
+          test: "Invalid state token",
+          reason: "State param not validated against session store.",
+        },
+        {
+          test: "PII masking snapshot",
+          reason: "Ensure masked email/phone in audit log entries.",
+        },
+      ],
+    },
+  ],
+};
 
 /* =========================================================
    STATE
    ========================================================= */
 const state = {
-  raw: null,
+  raw: DEMO_DATA,
   highRiskOnly: false,
   sortMode: "risk_desc",
+  loading: false,
+  progressTimer: null,
 };
 
 /* =========================================================
@@ -153,10 +104,11 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-function countByType(reviews) {
-  const errors = reviews.filter((r) => r.type === "danger");
-  const warnings = reviews.filter((r) => r.type === "warning");
-  const passed = reviews.filter((r) => r.type === "success");
+function countByType(reviews = []) {
+  const list = Array.isArray(reviews) ? reviews : [];
+  const errors = list.filter((r) => r.type === "danger");
+  const warnings = list.filter((r) => r.type === "warning");
+  const passed = list.filter((r) => r.type === "success");
   return { errors, warnings, passed };
 }
 
@@ -182,10 +134,11 @@ function computeConfidence(pr) {
 }
 
 function computeWhyRisky(pr) {
-  const text = `${pr.title} ${pr.coderabbitReviews
+  const reviews = pr.coderabbitReviews || [];
+  const text = `${pr.title} ${reviews
     .map((r) => `${r.name} ${r.description}`)
     .join(" ")}`.toLowerCase();
-  const { errors, warnings } = countByType(pr.coderabbitReviews);
+  const { errors, warnings } = countByType(reviews);
 
   const reasons = [];
 
@@ -336,16 +289,26 @@ function renderSection(title, items, kind) {
    RENDER MAIN
    ========================================================= */
 function getDerivedPR(pr) {
-  const groups = countByType(pr.coderabbitReviews);
+  const coderabbitReviews = pr.coderabbitReviews || [];
+  const generatedTests = pr.generatedTests || [];
+  const groups = countByType(coderabbitReviews);
   const confidence = computeConfidence(pr);
   const why = computeWhyRisky(pr);
   const fixFirst = computeFixOrder(pr);
 
-  return { ...pr, ...groups, confidence, why, fixFirst };
+  return {
+    ...pr,
+    coderabbitReviews,
+    generatedTests,
+    ...groups,
+    confidence,
+    why,
+    fixFirst,
+  };
 }
 
 function applyFiltersAndSort(prs) {
-  let list = prs.slice();
+  let list = (prs || []).slice();
 
   if (state.highRiskOnly) {
     list = list.filter((pr) => riskMeta(pr.risk).label === "High Risk");
@@ -356,7 +319,7 @@ function applyFiltersAndSort(prs) {
     errors_desc: (a, b) => b.errors.length - a.errors.length,
     warnings_desc: (a, b) => b.warnings.length - a.warnings.length,
     confidence_desc: (a, b) => b.confidence - a.confidence,
-  }[state.sortMode];
+  }[state.sortMode] || (() => 0);
 
   list.sort(compare);
   return list;
@@ -366,7 +329,17 @@ function renderPullRequests(data) {
   const container = document.getElementById("accordion");
   container.innerHTML = "";
 
-  const derived = data.pullRequests.map(getDerivedPR);
+  const dataset = Array.isArray(data?.pullRequests) ? data.pullRequests : [];
+  if (dataset.length === 0) {
+    container.innerHTML = `
+      <div class="rounded-lg bg-[#0f172a] border border-slate-800 p-6 text-slate-400">
+        No pull requests loaded. Enter your credentials above and click Analyze.
+      </div>
+    `;
+    return;
+  }
+
+  const derived = dataset.map(getDerivedPR);
   const view = applyFiltersAndSort(derived);
 
   if (!view.length) {
@@ -564,6 +537,102 @@ function renderPullRequests(data) {
 }
 
 /* =========================================================
+   ANALYZE FORM + STATUS
+   ========================================================= */
+function setStatus(tone, message) {
+  const el = document.getElementById("analysisStatus");
+  if (!el) return;
+
+  const toneStyles = {
+    info: "text-slate-300 bg-slate-900/60 border border-slate-800",
+    success: "text-emerald-300 bg-emerald-500/10 border border-emerald-500/30",
+    error: "text-red-300 bg-red-500/10 border border-red-500/30",
+  };
+
+  const base = "text-xs rounded-md px-3 py-2";
+  el.className = `${base} ${toneStyles[tone] || toneStyles.info}`;
+  el.textContent = message;
+}
+
+function toggleAnalyzeLoading(isLoading) {
+  const btn = document.getElementById("analyzeBtn");
+  if (!btn) return;
+  state.loading = isLoading;
+  btn.disabled = isLoading;
+  btn.textContent = isLoading ? "Analyzing..." : "Analyze";
+}
+
+function startProgress() {
+  const track = document.getElementById("progressContainer");
+  const bar = document.getElementById("progressFill");
+  if (!track || !bar) return;
+
+  let pct = 6;
+  bar.style.width = `${pct}%`;
+  track.classList.remove("hidden");
+
+  clearInterval(state.progressTimer);
+  state.progressTimer = setInterval(() => {
+    pct = Math.min(pct + Math.random() * 12, 92);
+    bar.style.width = `${pct}%`;
+  }, 350);
+}
+
+function stopProgress(success = true) {
+  const track = document.getElementById("progressContainer");
+  const bar = document.getElementById("progressFill");
+  if (!track || !bar) return;
+
+  clearInterval(state.progressTimer);
+  state.progressTimer = null;
+  bar.style.width = success ? "100%" : "0%";
+
+  setTimeout(() => {
+    bar.style.width = "0%";
+    track.classList.add("hidden");
+  }, success ? 500 : 0);
+}
+
+async function handleAnalyzeClick() {
+  const githubToken = document.getElementById("githubToken")?.value.trim();
+  const daytonaApiKey = document.getElementById("daytonaApiKey")?.value.trim();
+  const openaiApiKey = document.getElementById("openaiApiKey")?.value.trim();
+
+  if (!githubToken || !daytonaApiKey || !openaiApiKey) {
+    setStatus("error", "Please enter all three keys before analyzing.");
+    return;
+  }
+
+  let success = false;
+  try {
+    toggleAnalyzeLoading(true);
+    setStatus("info", "Analyzing pull requests...");
+    startProgress();
+    const data = await fetchPullRequests({
+      githubToken,
+      daytonaApiKey,
+      openaiApiKey,
+    });
+    state.raw = data;
+    renderPullRequests(state.raw);
+    setStatus("success", "Analysis complete. Results loaded.");
+    success = true;
+  } catch (err) {
+    console.error(err);
+    setStatus("error", err.message || "Failed to analyze pull requests.");
+  } finally {
+    stopProgress(success);
+    toggleAnalyzeLoading(false);
+  }
+}
+
+function bindAnalyze() {
+  const analyzeBtn = document.getElementById("analyzeBtn");
+  if (!analyzeBtn) return;
+  analyzeBtn.addEventListener("click", () => handleAnalyzeClick());
+}
+
+/* =========================================================
    ACCORDION
    ========================================================= */
 function openAccordion(btn, content, skipScroll = false) {
@@ -598,6 +667,7 @@ function attachAccordionHandlers() {
 function bindControls() {
   const highRiskOnly = document.getElementById("highRiskOnly");
   const sortMode = document.getElementById("sortMode");
+  if (!highRiskOnly || !sortMode) return;
 
   highRiskOnly.addEventListener("change", (e) => {
     state.highRiskOnly = e.target.checked;
@@ -613,8 +683,12 @@ function bindControls() {
 /* =========================================================
    INIT
    ========================================================= */
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
   bindControls();
-  state.raw = await fetchPullRequests();
+  bindAnalyze();
+  setStatus(
+    "info",
+    "Showing demo data. Provide your tokens and click Analyze to fetch live pull request insights."
+  );
   renderPullRequests(state.raw);
 });

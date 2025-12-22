@@ -1,0 +1,118 @@
+PR Risk Intelligence – Backend Integration Manual
+================================================
+
+Overview
+--------
+The front-end calls a single backend endpoint to retrieve pull request analysis. It passes user-provided credentials (GitHub, Daytona, OpenAI) and expects a JSON payload shaped for UI rendering. This document describes the contract, validation, and operational notes for backend engineers.
+
+Endpoint Contract
+-----------------
+- Path: POST /api/analyze
+- Request: JSON body
+  {
+    "githubToken": "<string>",          // required
+    "daytonaApiKey": "<string>",        // required
+    "openaiApiKey": "<string>"          // required
+  }
+- Response: JSON
+  {
+    "pullRequests": [
+      {
+        "id": "<string|number>",              // unique per PR
+        "title": "<string>",
+        "link": "<string URL>",               // UI uses for "View Pull Request"
+        "risk": <0-100 number>,               // aggregate risk score
+        "coderabbitReviews": [
+          {
+            "name": "<string>",
+            "type": "danger"|"warning"|"success",
+            "risk": <0-100 number>,           // optional for success items; required for danger/warning
+            "description": "<string>"
+          }
+        ],
+        "generatedTests": [
+          {
+            "test": "<string>",               // short test name
+            "reason": "<string>"              // why this test was generated
+          }
+        ]
+      }
+    ]
+  }
+- Errors: respond with non-2xx status and text or JSON message. Front-end surfaces the response text.
+
+Validation Rules
+----------------
+- Reject requests missing any of githubToken, daytonaApiKey, openaiApiKey with 400.
+- Enforce token format checks where possible (non-empty, expected prefix if applicable).
+- Rate-limit per user/session to avoid abuse (e.g., token bucket).
+- CORS: allow the front-end origin; restrict credentials in-flight.
+
+Processing Flow (Recommended)
+-----------------------------
+1) Authenticate GitHub token; fetch open pull requests relevant to the user/org.
+2) For each PR, gather signals:
+   - Static analysis / lint results (if available).
+   - Review summaries (e.g., from CodeRabbit or internal checks).
+   - Metadata (changed files, touched paths, labels).
+3) Optional: use Daytona API key to provision ephemeral environments or retrieve prior runs.
+4) Use OpenAI API to summarize risk, generate “why risky” notes, and propose generatedTests.
+5) Compute an aggregate risk score (0-100). Higher = riskier.
+6) Populate coderabbitReviews with type + risk + description. At least one item should exist for danger/warning when risk is high.
+7) Return the response payload; keep total size reasonable (<200KB).
+
+Sample Response
+---------------
+{
+  "pullRequests": [
+    {
+      "id": "123",
+      "title": "Harden onboarding OAuth + audit logging",
+      "link": "https://github.com/org/repo/pull/123",
+      "risk": 72,
+      "coderabbitReviews": [
+        { "name": "Token leakage check", "type": "danger", "risk": 84, "description": "OAuth callback path can log sensitive params." },
+        { "name": "PII masking", "type": "warning", "risk": 55, "description": "Audit log omits masking on email + phone." },
+        { "name": "Happy path tests", "type": "success", "description": "Primary OAuth flow passes regression suite." }
+      ],
+      "generatedTests": [
+        { "test": "Invalid state token", "reason": "State param not validated against session store." },
+        { "test": "PII masking snapshot", "reason": "Ensure masked email/phone in audit log entries." }
+      ]
+    }
+  ]
+}
+
+Status & Progress UX
+--------------------
+- Front-end shows a progress bar and status text during analysis. Return promptly or stream partial updates if desired (but final JSON is required).
+- On error, set an informative response body (plain text is OK); UI displays it directly.
+
+Deployment Notes
+----------------
+- Keep the endpoint path stable (/api/analyze); if changed, coordinate with front-end.
+- Ensure HTTPS and secure cookie/session handling.
+- Log with PII scrubbing; avoid persisting raw tokens.
+- Timeouts: front-end expects sub-60s responses; return 504/500 if exceeding and include a brief reason.
+
+Testing Checklist
+-----------------
+- 200 response with populated pullRequests renders correctly.
+- Empty pullRequests returns gracefully and shows “No pull requests loaded” in UI.
+- Missing credentials -> 400 with message; UI shows error.
+- Invalid token -> 401/403 with message; UI shows error.
+- Large lists (50+ PRs) still performant; consider pagination or sampling.
+
+Front-End Feature Notes
+-----------------------
+- Cyber-styled UI with neon gradients, scanline overlay, and custom mono fonts.
+- Credentials panel: inputs for GitHub, Daytona, and OpenAI keys; Analyze button triggers backend call.
+- Status line shows info/success/error messages; progress bar animates during analysis.
+- Accordion list renders pull requests with risk/confidence badges, reasons, and generated tests; demo PR data is shown until the first analysis runs.
+
+app.js Change Summary
+---------------------
+- Replaced mock data fetch with POST /api/analyze; sends { githubToken, daytonaApiKey, openaiApiKey } JSON.
+- Added demo seed data for initial render; render pipeline now guards empty/invalid responses.
+- Added loading flow: status text, disable Analyze button, and animated progress bar start/stop.
+- Hardened helpers (safe array handling, sorter fallback) and guarded control binding to avoid null refs.
