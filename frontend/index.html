@@ -50,9 +50,9 @@
               </p>
             </div>
             <button
-              id="analyzeBtn"
-              class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-emerald-500 to-cyan-400 text-slate-900 px-4 py-2 text-sm font-semibold hover:from-emerald-400 hover:to-cyan-300 transition disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_0_18px_rgba(52,211,153,0.45)]">
-              Analyze ▷
+              id="loadReposBtn"
+              class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-cyan-500 to-blue-400 text-slate-900 px-4 py-2 text-sm font-semibold hover:from-cyan-400 hover:to-blue-300 transition disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_0_18px_rgba(34,211,238,0.45)]">
+              Load Repos ▷
             </button>
           </div>
 
@@ -71,7 +71,7 @@
               <input
                 id="daytonaApiKey"
                 type="password"
-                placeholder="Enter Your Dytona API Key here"
+                placeholder="Enter Your Daytona API Key here"
                 class="w-full bg-[#060c17] border border-cyan-500/30 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 placeholder:text-slate-500" />
             </label>
 
@@ -83,6 +83,46 @@
                 placeholder="Enter Your OpenAI API Key here"
                 class="w-full bg-[#060c17] border border-cyan-500/30 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 placeholder:text-slate-500" />
             </label>
+          </div>
+
+          <!-- Repo Selection -->
+          <div id="repoSection" class="hidden">
+            <label class="space-y-1 block text-sm">
+              <span class="text-emerald-200">Search & Select Repository</span>
+              <div class="relative">
+                <input
+                  id="repoSearch"
+                  type="text"
+                  placeholder="Type to search repositories..."
+                  autocomplete="off"
+                  class="w-full bg-[#060c17] border border-cyan-500/30 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 placeholder:text-slate-500" />
+                <div id="repoDropdown" class="absolute z-50 w-full mt-1 bg-[#0b1220] border border-cyan-500/30 rounded-md shadow-lg max-h-60 overflow-y-auto hidden">
+                  <div id="repoOptions" class="py-1"></div>
+                </div>
+              </div>
+              <input type="hidden" id="repoSelect" value="" />
+            </label>
+          </div>
+
+          <!-- PR Selection -->
+          <div id="prSection" class="hidden">
+            <div class="flex items-start gap-3">
+              <div class="flex-1">
+                <label class="space-y-1 block text-sm">
+                  <span class="text-emerald-200">Select Pull Requests</span>
+                  <div id="prList" class="max-h-48 overflow-y-auto bg-[#060c17] border border-cyan-500/30 rounded-md p-2 space-y-2">
+                    <div class="text-xs text-slate-400">Loading PRs...</div>
+                  </div>
+                </label>
+              </div>
+              <div class="pt-6">
+                <button
+                  id="analyzeBtn"
+                  class="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-emerald-500 to-cyan-400 text-slate-900 px-4 py-2 text-sm font-semibold hover:from-emerald-400 hover:to-cyan-300 transition disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_0_18px_rgba(52,211,153,0.45)] hidden">
+                  Analyze ▷
+                </button>
+              </div>
+            </div>
           </div>
 
           <div

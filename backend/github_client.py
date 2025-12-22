@@ -35,6 +35,41 @@ class GitHubAPIClient:
             "X-GitHub-Api-Version": "2022-11-28"
         }
     
+    def _make_request(self, url: str, method: str = "GET", params: Optional[Dict] = None, json_data: Optional[Dict] = None) -> List[Dict]:
+        """Make a request to GitHub API with pagination support"""
+        all_results = []
+        page = 1
+        per_page = 100
+        
+        while True:
+            if params is None:
+                params = {}
+            params = params.copy()
+            params["page"] = page
+            params["per_page"] = per_page
+            
+            if method == "GET":
+                response = requests.get(url, headers=self.headers, params=params)
+            elif method == "POST":
+                response = requests.post(url, headers=self.headers, params=params, json=json_data)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
+            
+            response.raise_for_status()
+            data = response.json()
+            
+            # Handle pagination
+            if isinstance(data, list):
+                all_results.extend(data)
+                if len(data) < per_page:
+                    break
+                page += 1
+            else:
+                # Single result
+                return data
+        
+        return all_results
+    
     def get_pr_info(self, owner: str, repo: str, pr_number: int) -> Dict:
         """Fetch PR information from GitHub"""
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pr_number}"
@@ -94,13 +129,49 @@ class GitHubAPIClient:
         
         return False
     
-    def trigger_unit_test_generation(self, owner: str, repo: str, pr_number: int) -> Dict:
+    def has_test_generation_request(self, owner: str, repo: str, pr_number: int) -> bool:
+        """
+        Check if a test generation request was already made for this PR.
+        Looks for existing comments containing '@coderabbitai generate unit tests'
+        """
+        comments = self.get_pr_issue_comments(owner, repo, pr_number)
+        request_text = "@coderabbitai generate unit tests"
+        
+        for comment in comments:
+            body = comment.get('body', '').lower()
+            user = comment.get('user', {}).get('login', '').lower()
+            # Check if this comment requests test generation
+            # Also check if it's from the same user (to avoid duplicate requests from same user)
+            if request_text.lower() in body:
+                return True
+        
+        return False
+    
+    def trigger_unit_test_generation(self, owner: str, repo: str, pr_number: int, force: bool = False) -> Optional[Dict]:
         """
         Trigger Coderabbit unit test generation by posting a comment.
         
         According to Coderabbit docs, posting '@coderabbitai generate unit tests'
         triggers the unit test generation feature.
+        
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            pr_number: PR number
+            force: If True, request even if test PR exists or request was already made
+        
+        Returns:
+            Comment dict if successful, None if skipped (test PR exists or request already made)
         """
+        # First check if test PR already exists
+        existing_test_pr = self.find_coderabbit_test_pr(owner, repo, pr_number)
+        if existing_test_pr and not force:
+            return None  # Test PR already exists, no need to request again
+        
+        # Check if request was already made
+        if not force and self.has_test_generation_request(owner, repo, pr_number):
+            return None  # Request already made, skip
+        
         url = f"{self.base_url}/repos/{owner}/{repo}/issues/{pr_number}/comments"
         payload = {
             "body": "@coderabbitai generate unit tests"

@@ -7,9 +7,9 @@ import logging
 import time
 import re
 from typing import Dict, Optional
-from github_client import GitHubAPIClient
-from test_runner import TestRunner
-from gpt_analyzer import GPTAnalyzer
+from backend.github_client import GitHubAPIClient
+from backend.test_runner import TestRunner
+from backend.gpt_analyzer import GPTAnalyzer
 
 
 class PRProcessor:
@@ -66,17 +66,30 @@ class PRProcessor:
         
         # Step 2: Generate unit tests (if not skipped)
         if not skip_tests and self.test_runner:
-            self.logger.info("Triggering unit test generation...")
+            self.logger.info("Checking for existing test PR or pending requests...")
             try:
-                comment = self.github_client.trigger_unit_test_generation(owner, repo, pr_number)
-                self.logger.info(f"Unit test generation triggered: {comment.get('html_url')}")
-                
-                # Wait a bit for Coderabbit to process
-                self.logger.info("Waiting for Coderabbit to generate tests...")
-                time.sleep(10)  # Wait 10 seconds
-                
-                # Find test PR
+                # First check if test PR already exists
                 test_pr = self.github_client.find_coderabbit_test_pr(owner, repo, pr_number)
+                if test_pr:
+                    self.logger.info(f"Test PR #{test_pr['number']} already exists, skipping request")
+                else:
+                    # Check if request was already made
+                    if self.github_client.has_test_generation_request(owner, repo, pr_number):
+                        self.logger.info("Test generation already requested, waiting for CodeRabbit...")
+                    else:
+                        # Request test generation
+                        comment = self.github_client.trigger_unit_test_generation(owner, repo, pr_number)
+                        if comment:
+                            self.logger.info(f"Unit test generation triggered: {comment.get('html_url')}")
+                            # Wait a bit for Coderabbit to process
+                            self.logger.info("Waiting for Coderabbit to generate tests...")
+                            time.sleep(10)  # Wait 10 seconds
+                            # Find test PR
+                            test_pr = self.github_client.find_coderabbit_test_pr(owner, repo, pr_number)
+                        else:
+                            self.logger.info("Test generation skipped (already exists or requested)")
+                            # Still try to find existing test PR
+                            test_pr = self.github_client.find_coderabbit_test_pr(owner, repo, pr_number)
                 
                 if test_pr:
                     test_pr_number = test_pr['number']
@@ -178,10 +191,31 @@ class PRProcessor:
         description = body
         # Remove markdown code blocks
         description = re.sub(r'```[\s\S]*?```', '', description)
+        # Remove inline code
+        description = re.sub(r'`([^`]+)`', r'\1', description)
         # Remove HTML comments
         description = re.sub(r'<!--[\s\S]*?-->', '', description)
+        # Remove markdown headers (##, ###, etc.)
+        description = re.sub(r'^#{1,6}\s+', '', description, flags=re.MULTILINE)
+        # Remove markdown links but keep text [text](url) -> text
+        description = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', description)
+        # Remove markdown images
+        description = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', '', description)
+        # Remove markdown tables (lines with |)
+        description = re.sub(r'\|[^\n]*\|', '', description)
+        # Remove markdown bold/italic
+        description = re.sub(r'\*\*([^\*]+)\*\*', r'\1', description)
+        description = re.sub(r'\*([^\*]+)\*', r'\1', description)
+        description = re.sub(r'__([^_]+)__', r'\1', description)
+        description = re.sub(r'_([^_]+)_', r'\1', description)
+        # Remove markdown lists
+        description = re.sub(r'^\s*[-*+]\s+', '', description, flags=re.MULTILINE)
+        description = re.sub(r'^\s*\d+\.\s+', '', description, flags=re.MULTILINE)
+        # Remove extra whitespace and newlines
+        description = re.sub(r'\n{3,}', '\n\n', description)
+        description = re.sub(r'[ \t]+', ' ', description)
         # Limit length
-        description = description.strip()[:300] + "..." if len(description) > 300 else description.strip()
+        description = description.strip()[:500] + "..." if len(description) > 500 else description.strip()
         
         review_info = {
             "name": name or "Coderabbit Review",
@@ -200,7 +234,7 @@ class PRProcessor:
         test_pr_number: int
     ) -> Dict:
         """Run tests in Daytona sandbox"""
-        from run_tests_daytona import (
+        from backend.run_tests_daytona import (
             prepare_files_from_pr,
             parse_imports_from_test_files,
             fetch_source_files_from_imports,
@@ -340,7 +374,7 @@ class PRProcessor:
     
     def _get_pr_files(self, owner: str, repo: str, pr_number: int) -> Dict:
         """Get PR files for GPT analysis"""
-        from run_tests_daytona import prepare_files_from_pr
+        from backend.run_tests_daytona import prepare_files_from_pr
         return prepare_files_from_pr(
             self.github_client, owner, repo, pr_number, fetch_all=True
         )

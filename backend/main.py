@@ -13,10 +13,10 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 
-from github_client import GitHubAPIClient
-from test_runner import TestRunner
-from gpt_analyzer import GPTAnalyzer
-from pr_processor import PRProcessor
+from backend.github_client import GitHubAPIClient
+from backend.test_runner import TestRunner
+from backend.gpt_analyzer import GPTAnalyzer
+from backend.pr_processor import PRProcessor
 
 # Load environment variables
 load_dotenv()

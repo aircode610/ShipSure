@@ -18,7 +18,7 @@ from daytona import Daytona, DaytonaConfig
 # Load environment variables from .env file
 load_dotenv()
 
-from github_client import GitHubAPIClient
+from backend.github_client import GitHubAPIClient
 
 
 class TestRunner:

@@ -138,11 +138,27 @@ Provide a JSON response with the following structure:
     "risk": <number 0-100>,
     "confidence": <number 0-100>,
     "reasoning": "<explanation>",
+    "riskCategories": {{
+        "security": <number 0-100>,
+        "performance": <number 0-100>,
+        "maintainability": <number 0-100>,
+        "reliability": <number 0-100>,
+        "compatibility": <number 0-100>
+    }},
+    "specificRisks": [
+        {{
+            "category": "<security|performance|maintainability|reliability|compatibility>",
+            "severity": "<critical|high|medium|low>",
+            "description": "<specific risk description>",
+            "impact": "<what could go wrong>",
+            "recommendation": "<how to mitigate>"
+        }}
+    ],
     "reviewUpdates": {{
         "<review_name>": {{
             "risk": <number 0-100>,
             "type": "<danger|warning|success|info>",
-            "description": "<updated description>"
+            "description": "<updated description with specific risk details>"
         }}
     }}
 }}
@@ -155,22 +171,31 @@ Risk Assessment Guidelines:
 - Medium (40-59): Business logic, utilities, helpers
 - Low (0-39): UI changes, documentation, configuration
 
+Risk Categories:
+1. Security (0-100): Authentication flaws, injection vulnerabilities, authorization issues, data exposure
+2. Performance (0-100): Slow queries, memory leaks, inefficient algorithms, blocking operations
+3. Maintainability (0-100): Code complexity, lack of documentation, tight coupling, code smells
+4. Reliability (0-100): Error handling, edge cases, race conditions, resource leaks
+5. Compatibility (0-100): Breaking changes, API versioning, dependency conflicts, platform issues
+
 Confidence Guidelines:
 - High (80-100): Many tests passed, comprehensive coverage
 - Medium (50-79): Some tests passed, moderate coverage
 - Low (0-49): Few/no tests passed, limited coverage
 
 Analyze each Coderabbit review and update risk scores based on:
-1. Code type (auth/DB = critical)
-2. Test coverage (more passed = higher confidence)
+1. Code type (auth/DB = critical security risk)
+2. Test coverage (more passed = higher confidence, failed tests = reliability risk)
 3. Review severity (danger = high risk, warning = medium, success = low)
 4. Generated test code analysis - Review the test code provided above. For each test, analyze:
    - What functionality is being tested
    - Why this test was likely generated (what code pattern or risk it addresses)
    - Whether the test adequately covers the functionality
-   - If the test reveals any security or quality concerns
+   - If the test reveals any security, performance, or quality concerns
 
-When updating review descriptions, include insights from the test code analysis. For example, if a test checks for SQL injection, mention that in the review update.
+Provide at least 3-5 specific risks in the specificRisks array, covering different categories when possible. Each risk should be unique and actionable.
+
+When updating review descriptions, include insights from the test code analysis. For example, if a test checks for SQL injection, mention that in the review update and categorize it as a security risk.
 """
         
         return prompt
