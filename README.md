@@ -1,4 +1,12 @@
 # ShipSure - PR Risk Intelligence
+# 1- Analyzing
+![Alt Text for Screen Readers](https://github.com/danialeyz/ShipSure/blob/main/analyzing.png)
+
+# 2- Loaded PRs
+![Alt Text for Screen Readers](https://github.com/danialeyz/ShipSure/blob/main/loaded.png)
+
+# 3- Analysis Example 
+![Alt Text for Screen Readers](https://github.com/danialeyz/ShipSure/blob/main/example.png)
 
 ShipSure is an AI-powered pull request risk analysis tool that automatically analyzes GitHub pull requests, generates unit tests using CodeRabbit, runs them in Daytona sandboxes, and provides comprehensive risk assessments using GPT.
 
@@ -42,6 +50,10 @@ python server.py
 2. Open your browser and navigate to:
 ```
 http://localhost:5000
+```
+Or if you are using Live server extension for running front end:
+```
+http://localhost:5500
 ```
 
 3. In the web interface:
